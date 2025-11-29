@@ -1,25 +1,40 @@
-import requests
+import os
 from pathlib import Path
+import requests
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
 
 # --------------------- CONFIGURATION ---------------------
 API_URL = "https://api.api-ninjas.com/v1/animals"
-API_KEY = "NkGoA6SmFd8K9/R8j0Vo4g==2tS6KSZmV9oiagM5"          # ← Replace with your free key from https://api-ninjas.com
+API_KEY = os.getenv("API_KEY")  # Loaded from .env
 TEMPLATE_FILE = Path("animals_template.html")
 OUTPUT_FILE = Path("animals.html")
 PLACEHOLDER = "__REPLACE_ANIMALS_INFO__"
+TIMEOUT = 10  # seconds for API requests
 # ---------------------------------------------------------
 
-def fetch_animals(animal_name: str):
+def fetch_animals(animal_name):
     """Call the API and return a list of animals matching the name."""
+    if not API_KEY:
+        print("[Error] API_KEY is not set. Please add it to your .env file.")
+        return []
+
     headers = {"X-Api-Key": API_KEY}
     params = {"name": animal_name.strip()}
 
     try:
-        response = requests.get(API_URL, headers=headers, params=params, timeout=10)
+        response = requests.get(API_URL, headers=headers, params=params, timeout=TIMEOUT)
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        if isinstance(data, list):
+            return data
+        else:
+            print(f"[Warning] Unexpected API response format: {data}")
+            return []
     except requests.exceptions.RequestException as e:
-        print(f"Error contacting the API: {e}")
+        print(f"[Error] API request failed: {e}")
         return []
 
 
@@ -29,24 +44,15 @@ def generate_cards(animals):
 
     for animal in animals:
         name = animal.get("name", "Unknown Animal")
-
         chars = animal.get("characteristics", {})
 
-        # Diet
         diet = chars.get("diet", "Unknown")
-
-        # First location (if any)
         locations = animal.get("locations", [])
         location = locations[0] if locations else "Worldwide"
 
-        # Type / Class – the API puts the taxonomic class in two possible places
-        animal_type = (
-            chars.get("class") or
-            animal.get("taxonomy", {}).get("class") or
-            "Unknown"
-        )
+        animal_type = chars.get("class") or animal.get("taxonomy", {}).get("class") or "Unknown"
 
-        # Simple HTML escaping for safety
+        # Simple HTML escaping
         name_safe = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
         card = f"""    <li class="cards__item">
@@ -66,7 +72,6 @@ def main():
     print("Animal Web Generator")
     print("This tool creates a beautiful HTML page with animal cards using live API data.\n")
 
-    # Ask the user
     animal_name = input("Enter the name of an animal (e.g. Fox, Monkey, Lion): ").strip()
     if not animal_name:
         print("No animal entered – exiting.")
@@ -80,11 +85,8 @@ def main():
         return
 
     print(f"Found {len(animals)} matching animal(s). Generating cards...")
-
-    # Generate the HTML cards
     cards_html = generate_cards(animals)
 
-    # Load template
     if not TEMPLATE_FILE.exists():
         print(f"Template file '{TEMPLATE_FILE}' not found!")
         return
@@ -95,7 +97,6 @@ def main():
         print(f"Template does not contain the placeholder '{PLACEHOLDER}'")
         return
 
-    # Inject cards and save
     final_html = template.replace(PLACEHOLDER, cards_html)
     OUTPUT_FILE.write_text(final_html, encoding="utf-8")
 
@@ -104,7 +105,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Quick check for the API key
-    if "YOUR_API_KEY_HERE" in API_KEY:
-        print("Warning: Please replace 'YOUR_API_KEY_HERE' with a real API key from https://api-ninjas.com")
+    if not API_KEY:
+        print("Warning: API_KEY not found in .env. Please add your API key.")
     main()
