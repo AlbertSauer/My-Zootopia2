@@ -1,71 +1,110 @@
-import json
 import requests
+from pathlib import Path
 
-# API Configuration
-API_URL = 'https://api.api-ninjas.com/v1/animals'
-API_KEY = 'NkGoA6SmFd8K9/R8j0Vo4g==2tS6KSZmV9oiagM5'  #API KEY!!!
-SEARCH_TERM = 'fox'
+# --------------------- CONFIGURATION ---------------------
+API_URL = "https://api.api-ninjas.com/v1/animals"
+API_KEY = "NkGoA6SmFd8K9/R8j0Vo4g==2tS6KSZmV9oiagM5"          # ← Replace with your free key from https://api-ninjas.com
+TEMPLATE_FILE = Path("animals_template.html")
+OUTPUT_FILE = Path("animals.html")
+PLACEHOLDER = "__REPLACE_ANIMALS_INFO__"
+# ---------------------------------------------------------
 
-
-# 1. Fetch animal data from API
-def fetch_animals():
-    headers = {'X-Api-Key': API_KEY}
-    params = {'name': SEARCH_TERM}
+def fetch_animals(animal_name: str):
+    """Call the API and return a list of animals matching the name."""
+    headers = {"X-Api-Key": API_KEY}
+    params = {"name": animal_name.strip()}
 
     try:
-        response = requests.get(API_URL, headers=headers, params=params)
-        response.raise_for_status()  # Raises error for bad status
-        data = response.json()
-        print(f"Fetched {len(data)} fox-related animals from API.")
-        return data
+        response = requests.get(API_URL, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"API error: {e}")
+        print(f"Error contacting the API: {e}")
         return []
 
 
-data = fetch_animals()
+def generate_cards(animals):
+    """Create HTML <li> cards for a list of animals."""
+    cards = []
 
-# 2. Generate beautiful HTML cards
-output = ''
+    for animal in animals:
+        name = animal.get("name", "Unknown Animal")
 
-for animal in data:
-    # --- Safely extract data (API structure matches closely) ---
-    name = animal.get('name', 'Unknown Animal')
+        chars = animal.get("characteristics", {})
 
-    chars = animal.get('characteristics', {})
-    diet = chars.get('diet', 'Unknown')
+        # Diet
+        diet = chars.get("diet", "Unknown")
 
-    # Location: take the first one if available
-    location = 'Unknown'
-    if animal.get('locations') and len(animal['locations']) > 0:
-        location = animal['locations'][0]
+        # First location (if any)
+        locations = animal.get("locations", [])
+        location = locations[0] if locations else "Worldwide"
 
-    # Type: prefer 'class' from characteristics (API uses taxonomy.class too, but this is simpler)
-    animal_type = 'Unknown'
-    if chars.get('class'):
-        animal_type = chars['class']
-    elif animal.get('taxonomy', {}).get('class'):
-        animal_type = animal['taxonomy']['class']
+        # Type / Class – the API puts the taxonomic class in two possible places
+        animal_type = (
+            chars.get("class") or
+            animal.get("taxonomy", {}).get("class") or
+            "Unknown"
+        )
 
-    # --- Build the professional card ---
-    output += '<li class="cards__item">\n'
-    output += f'  <div class="card__title">{name}</div>\n'
-    output += '  <p class="card__text">\n'
-    output += f'      <strong>Diet:</strong> {diet}<br/>\n'
-    output += f'      <strong>Location:</strong> {location}<br/>\n'
-    output += f'      <strong>Type:</strong> {animal_type}<br/>\n'
-    output += '  </p>\n'
-    output += '</li>\n\n'
+        # Simple HTML escaping for safety
+        name_safe = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-# 3. Load the template
-with open('animals_template.html', 'r', encoding='utf-8') as f:
-    template = f.read()
+        card = f"""    <li class="cards__item">
+      <div class="card__title">{name_safe}</div>
+      <p class="card__text">
+        <strong>Diet:</strong> {diet}<br/>
+        <strong>Location:</strong> {location}<br/>
+        <strong>Type:</strong> {animal_type}<br/>
+      </p>
+    </li>"""
+        cards.append(card)
 
-# 4. Inject our beautiful cards
-final_html = template.replace('__REPLACE_ANIMALS_INFO__', output)
+    return "\n".join(cards)
 
-# 5. Save the final masterpiece
-with open('animals.html', 'w', encoding='utf-8') as f:
-    f.write(final_html)
 
-print("Open animals.html")
+def main():
+    print("Animal Web Generator")
+    print("This tool creates a beautiful HTML page with animal cards using live API data.\n")
+
+    # Ask the user
+    animal_name = input("Enter the name of an animal (e.g. Fox, Monkey, Lion): ").strip()
+    if not animal_name:
+        print("No animal entered – exiting.")
+        return
+
+    print(f"\nFetching data for '{animal_name}' from the API...")
+    animals = fetch_animals(animal_name)
+
+    if not animals:
+        print("No animals found or API error. Check your internet connection and API key.")
+        return
+
+    print(f"Found {len(animals)} matching animal(s). Generating cards...")
+
+    # Generate the HTML cards
+    cards_html = generate_cards(animals)
+
+    # Load template
+    if not TEMPLATE_FILE.exists():
+        print(f"Template file '{TEMPLATE_FILE}' not found!")
+        return
+
+    template = TEMPLATE_FILE.read_text(encoding="utf-8")
+
+    if PLACEHOLDER not in template:
+        print(f"Template does not contain the placeholder '{PLACEHOLDER}'")
+        return
+
+    # Inject cards and save
+    final_html = template.replace(PLACEHOLDER, cards_html)
+    OUTPUT_FILE.write_text(final_html, encoding="utf-8")
+
+    print(f"Website successfully generated → {OUTPUT_FILE}")
+    print("Open animals.html in your browser and enjoy!")
+
+
+if __name__ == "__main__":
+    # Quick check for the API key
+    if "YOUR_API_KEY_HERE" in API_KEY:
+        print("Warning: Please replace 'YOUR_API_KEY_HERE' with a real API key from https://api-ninjas.com")
+    main()
