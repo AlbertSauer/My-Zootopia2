@@ -3,7 +3,7 @@ import requests
 
 # --------------------- CONFIGURATION ---------------------
 API_URL = "https://api.api-ninjas.com/v1/animals"
-API_KEY = "NkGoA6SmFd8K9/R8j0Vo4g==2tS6KSZmV9oiagM5"   #
+API_KEY = 'NkGoA6SmFd8K9/R8j0Vo4g==2tS6KSZmV9oiagM5'
 # ---------------------------------------------------------
 
 def fetch_data(animal_name: str):

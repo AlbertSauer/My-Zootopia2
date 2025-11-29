@@ -1,27 +1,52 @@
-# animals_web_generator.py
-import data_fetcher
+import requests
 from pathlib import Path
 
 # --------------------- CONFIGURATION ---------------------
+API_URL = "https://api.api-ninjas.com/v1/animals"
+API_KEY = "NkGoA6SmFd8K9/R8j0Vo4g==2tS6KSZmV9oiagM5"          # ← Replace with your free key from https://api-ninjas.com
 TEMPLATE_FILE = Path("animals_template.html")
 OUTPUT_FILE = Path("animals.html")
 PLACEHOLDER = "__REPLACE_ANIMALS_INFO__"
 # ---------------------------------------------------------
 
+def fetch_animals(animal_name: str):
+    """Call the API and return a list of animals matching the name."""
+    headers = {"X-Api-Key": API_KEY}
+    params = {"name": animal_name.strip()}
+
+    try:
+        response = requests.get(API_URL, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error contacting the API: {e}")
+        return []
+
+
 def generate_cards(animals):
-    """Generate HTML cards from a list of animal dictionaries."""
+    """Create HTML <li> cards for a list of animals."""
     cards = []
+
     for animal in animals:
         name = animal.get("name", "Unknown Animal")
+
         chars = animal.get("characteristics", {})
+
+        # Diet
         diet = chars.get("diet", "Unknown")
+
+        # First location (if any)
         locations = animal.get("locations", [])
         location = locations[0] if locations else "Worldwide"
+
+        # Type / Class – the API puts the taxonomic class in two possible places
         animal_type = (
             chars.get("class") or
             animal.get("taxonomy", {}).get("class") or
             "Unknown"
         )
+
+        # Simple HTML escaping for safety
         name_safe = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
         card = f"""    <li class="cards__item">
@@ -33,58 +58,53 @@ def generate_cards(animals):
       </p>
     </li>"""
         cards.append(card)
+
     return "\n".join(cards)
 
 
-def generate_no_results_message(animal_name: str) -> str:
-    """fallback when no animals are found."""
-    safe_name = animal_name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    return f"""    <div class="no-results">
-      <h2>Oops! No animal found for "<strong>{safe_name}</strong>"</h2>
-      <p>Try a different spelling or a more common name like "Lion", "Eagle", or "Shark"</p>
-      <div style="font-size: 5rem; margin: 30px 0;">Question Mark</div>
-    </div>"""
-
-
 def main():
-    print("Animal Web Generator (Modular Edition)")
-    print("Uses live data from API-Ninjas\n")
+    print("Animal Web Generator")
+    print("This tool creates a beautiful HTML page with animal cards using live API data.\n")
 
-    animal_name = input("Enter the name of an animal: ").strip()
+    # Ask the user
+    animal_name = input("Enter the name of an animal (e.g. Fox, Monkey, Lion): ").strip()
     if not animal_name:
-        print("No input provided. Exiting.")
+        print("No animal entered – exiting.")
         return
 
-    print(f"\nFetching data for '{animal_name}'...")
-    animals = data_fetcher.fetch_data(animal_name)
+    print(f"\nFetching data for '{animal_name}' from the API...")
+    animals = fetch_animals(animal_name)
 
-    # Decide what to show
     if not animals:
-        print("No results found – showing friendly message.")
-        content = generate_no_results_message(animal_name)
-    else:
-        print(f"Found {len(animals)} animal(s)! Generating cards...")
-        content = generate_cards(animals)
+        print("No animals found or API error. Check your internet connection and API key.")
+        return
+
+    print(f"Found {len(animals)} matching animal(s). Generating cards...")
+
+    # Generate the HTML cards
+    cards_html = generate_cards(animals)
 
     # Load template
     if not TEMPLATE_FILE.exists():
-        print(f"Error: Template file '{TEMPLATE_FILE}' not found!")
+        print(f"Template file '{TEMPLATE_FILE}' not found!")
         return
 
     template = TEMPLATE_FILE.read_text(encoding="utf-8")
+
     if PLACEHOLDER not in template:
-        print(f"Error: Template missing placeholder '{PLACEHOLDER}'")
+        print(f"Template does not contain the placeholder '{PLACEHOLDER}'")
         return
 
-    # Generate final HTML
-    final_html = template.replace(PLACEHOLDER, content)
+    # Inject cards and save
+    final_html = template.replace(PLACEHOLDER, cards_html)
     OUTPUT_FILE.write_text(final_html, encoding="utf-8")
 
-    print(f"\nWebsite generated successfully → {OUTPUT_FILE}")
-    print("Open animals.html in your browser!")
+    print(f"Website successfully generated → {OUTPUT_FILE}")
+    print("Open animals.html in your browser and enjoy!")
 
 
 if __name__ == "__main__":
-    if "YOUR_API_KEY_HERE" in data_fetcher.API_KEY:
-        print("Warning: Please set a real API key in data_fetcher.py")
+    # Quick check for the API key
+    if "YOUR_API_KEY_HERE" in API_KEY:
+        print("Warning: Please replace 'YOUR_API_KEY_HERE' with a real API key from https://api-ninjas.com")
     main()
