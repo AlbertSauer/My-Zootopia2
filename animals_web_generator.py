@@ -3,7 +3,7 @@ from pathlib import Path
 
 # --------------------- CONFIGURATION ---------------------
 API_URL = "https://api.api-ninjas.com/v1/animals"
-API_KEY = "NkGoA6SmFd8K9/R8j0Vo4g==2tS6KSZmV9oiagM5"          # ← Replace with your free key from https://api-ninjas.com
+API_KEY = "NkGoA6SmFd8K9/R8j0Vo4g==2tS6KSZmV9oiagM5"          #
 TEMPLATE_FILE = Path("animals_template.html")
 OUTPUT_FILE = Path("animals.html")
 PLACEHOLDER = "__REPLACE_ANIMALS_INFO__"
@@ -64,7 +64,7 @@ def generate_cards(animals):
 
 def main():
     print("Animal Web Generator")
-    print("This tool creates a beautiful HTML page with animal cards using live API data.\n")
+    print("This tool creates a HTML page with animal cards using live API data.\n")
 
     # Ask the user
     animal_name = input("Enter the name of an animal (e.g. Fox, Monkey, Lion): ").strip()
